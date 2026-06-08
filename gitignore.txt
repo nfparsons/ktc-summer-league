@@ -1,0 +1,22 @@
+# --- secrets: NEVER commit DB credentials / auth ---
+.Renviron
+.Renviron.*
+*.pem
+
+# --- copyrighted source material (keep local only) ---
+*.pdf
+Dead_Silence*
+
+# --- board render provenance (regenerate from CSVs) ---
+*_render.png
+*_final.png
+
+# --- R / RStudio cruft ---
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata
+
+# --- OS noise ---
+.DS_Store
+Thumbs.db

@@ -1,0 +1,19 @@
+# Ctesiphus Expedition - environment variables.
+#
+# HOW TO USE:
+#   1. Fill in the values below from your Neon connection string (see README/chat).
+#   2. Save a COPY of this file as ".Renviron" (leading dot) in the project root.
+#   3. NEVER commit .Renviron - it holds your DB password (.gitignore covers it).
+#   4. Restart R so it is read: Session > Restart R (or .rs.restartR()).
+#
+# Your Neon string looks like:
+#   postgresql://USER:PASSWORD@HOST/DBNAME?sslmode=require
+# Map each piece to the variables below (port is 5432 unless stated).
+
+CTES_HOST=ep-REPLACE-ME.us-east-2.aws.neon.tech
+CTES_DB=neondb
+CTES_PORT=5432
+CTES_USER=neondb_owner
+CTES_PASS=REPLACE_WITH_YOUR_PASSWORD
+CTES_SSLMODE=require
+CTES_CAMPAIGN=1

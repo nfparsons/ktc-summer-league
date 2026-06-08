@@ -1,0 +1,27 @@
+Package: ctesiphus
+Title: Ctesiphus Expedition Campaign Manager
+Version: 0.1.0
+Authors@R:
+    person("League", "Facilitator", email = "you@example.com", role = c("aut", "cre"))
+Description: A Kill Team Summer League campaign manager for the Ctesiphus
+    Expedition rules (Dead Silence pack): a pure-functional R rules engine
+    (dice, hex geometry, exploration, and the movement/battle/action/threat
+    phases), a PostgreSQL persistence bridge, and a mobile-first Shiny app.
+License: file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.1
+Depends:
+    R (>= 4.1.0)
+Imports:
+    DBI,
+    RPostgres,
+    dplyr,
+    tibble,
+    jsonlite,
+    readr,
+    shiny,
+    bslib
+Suggests:
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
