@@ -56,7 +56,7 @@ theme <- bs_theme(
     .code-tag { font-family:'Chakra Petch'; font-size:2rem; letter-spacing:.2em; color:#36e0a0; }")
 
 ui <- page_navbar(
-  title = "KTC Campaign Tool", theme = theme, fillable = TRUE, id = "nav",
+  title = "KTC CAMPAIGN TOOL", theme = theme, fillable = TRUE, id = "nav",
   sidebar = sidebar(open = "closed", width = 280,
     selectInput("campaign", "Campaign (facilitator)", choices = NULL),
     selectInput("team", "Your kill team", choices = NULL),
@@ -84,6 +84,23 @@ ui <- page_navbar(
       div(class = "text-secondary", "Players join with this code or by scanning the QR."),
       div(class = "code-tag", textOutput("setup_code_txt", inline = TRUE)),
       plotOutput("setup_qr", height = "220px"))),
+
+  nav_panel("Manage", icon = icon("sliders"),
+    card(card_header("Campaign settings"),
+      textInput("mng_season", "Season name"),
+      numericInput("mng_maxthreat", "Max threat (campaign ends when reached)", 7, 2, 12),
+      checkboxInput("mng_signup", "Sign-ups open", TRUE),
+      actionButton("mng_save", "Save changes", class = "btn-primary w-100"),
+      div(class = "text-secondary mt-2", textOutput("mng_status"))),
+    card(card_header("Sign-up link & QR"),
+      div(class = "text-secondary", "Share this link or QR with players:"),
+      verbatimTextOutput("mng_link"),
+      div(class = "code-tag", textOutput("mng_code_txt", inline = TRUE)),
+      plotOutput("mng_qr", height = "220px"),
+      actionButton("mng_regen", "Regenerate code", class = "btn-secondary w-100")),
+    card(card_header("Danger zone"),
+      div(class = "text-secondary", "Permanently delete this campaign and all its data."),
+      actionButton("mng_delete", "Delete campaign", class = "btn-danger w-100"))),
 
   nav_panel("Join", icon = icon("user-plus"),
     card(card_header("Find your campaign"),
@@ -121,15 +138,13 @@ ui <- page_navbar(
       layout_columns(
         actionButton("resolve", "Resolve current phase", class = "btn-warning"),
         actionButton("advance", "Advance / begin", class = "btn-primary"))),
-    card(card_header("Join code"),
-      div(class = "code-tag", textOutput("fac_code_txt", inline = TRUE)),
-      plotOutput("fac_qr", height = "200px")),
     card(card_header("Resolution log"), verbatimTextOutput("facilitator_log")))
 )
 
 server <- function(input, output, session) {
   rv <- reactiveValues(board = NULL, log = character(0), err = NULL, campaign_id = NULL,
-                       setup_map = NULL, setup_msg = "", join_msg = "", join_tick = 0)
+                       setup_map = NULL, setup_msg = "", join_msg = "",
+                       mng_msg = "", join_tick = 0)
 
   withCon <- function(fn) tryCatch(
     { con <- db_connect(); on.exit(DBI::dbDisconnect(con)); fn(con) },
@@ -204,9 +219,12 @@ server <- function(input, output, session) {
     if (!requireNamespace("qrcode", quietly = TRUE)) { plot.new(); text(.5,.5,"Install 'qrcode' for QR codes"); return() }
     plot(qrcode::qr_code(paste0(base_url(), "?join=", rv$board$join_code)))
   })
-  qr_render("setup_qr"); qr_render("fac_qr")
+  qr_render("setup_qr"); qr_render("mng_qr")
   output$setup_code_txt <- renderText(if (!is.null(rv$board)) rv$board$join_code %||% "" else "")
-  output$fac_code_txt   <- renderText(if (!is.null(rv$board)) rv$board$join_code %||% "" else "")
+  output$mng_code_txt   <- renderText(if (!is.null(rv$board)) rv$board$join_code %||% "" else "")
+  output$mng_link <- renderText(if (!is.null(rv$board) && !is.null(rv$board$join_code))
+    paste0(base_url(), "?join=", rv$board$join_code) else "Create or select a campaign first.")
+  output$mng_status <- renderText(rv$mng_msg)
 
   # ---- Setup ----------------------------------------------------------------
   observeEvent(input$set_map, {
@@ -235,6 +253,34 @@ server <- function(input, output, session) {
                             cid, rv$setup_map, length(roster))
   })
   output$setup_status <- renderText(rv$setup_msg)
+
+  # ---- Manage ---------------------------------------------------------------
+  observe({ req(rv$board)
+    updateTextInput(session, "mng_season", value = rv$board$season %||% "")
+    updateNumericInput(session, "mng_maxthreat", value = rv$board$max_threat)
+    updateCheckboxInput(session, "mng_signup", value = isTRUE(rv$board$signup_open)) })
+  observeEvent(input$mng_save, { req(rv$campaign_id)
+    ok <- withCon(function(con) update_campaign(con, rv$campaign_id,
+      season_name = input$mng_season, max_threat = input$mng_maxthreat,
+      signup_open = input$mng_signup))
+    set_campaign_choices(selected = rv$campaign_id); refresh()
+    rv$mng_msg <- if (is.null(ok)) paste("Save failed:", rv$err) else "Saved." })
+  observeEvent(input$mng_regen, { req(rv$campaign_id)
+    code <- withCon(function(con) regen_join_code(con, rv$campaign_id)); refresh()
+    rv$mng_msg <- if (is.null(code)) paste("Failed:", rv$err) else paste("New join code:", code) })
+  observeEvent(input$mng_delete, { req(rv$board)
+    showModal(modalDialog(title = "Delete campaign?",
+      sprintf("This permanently deletes '%s' and all of its data. This cannot be undone.",
+              rv$board$season %||% ""),
+      footer = tagList(modalButton("Cancel"),
+        actionButton("mng_delete_confirm", "Delete permanently", class = "btn-danger")))) })
+  observeEvent(input$mng_delete_confirm, { removeModal(); req(rv$campaign_id)
+    ok <- withCon(function(con) delete_campaign(con, rv$campaign_id))
+    if (is.null(ok)) { rv$mng_msg <- paste("Delete failed:", rv$err); return() }
+    rv$board <- NULL; rv$campaign_id <- NULL
+    cs <- set_campaign_choices()
+    if (!is.null(cs) && nrow(cs)) { rv$campaign_id <- cs$campaign_id[1]; refresh() }
+    else nav_select("nav", "Setup") })
 
   # ---- Join (code-gated) ----------------------------------------------------
   observeEvent(input$find_campaign, {

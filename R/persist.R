@@ -34,7 +34,7 @@ db_connect <- function() {
 # ---- load -------------------------------------------------------------------
 load_board <- function(con, campaign_id) {
   camp <- DBI::dbGetQuery(con,
-    "SELECT season_name, join_code, current_threat, max_threat,
+    "SELECT season_name, join_code, signup_open, current_threat, max_threat,
             current_round, current_phase, phase_status
        FROM campaign WHERE campaign_id = $1", params = list(campaign_id))
   keys <- .hexmap_keys(con, campaign_id)
@@ -91,6 +91,7 @@ load_board <- function(con, campaign_id) {
 
   list(map = map, teams = teams,
        season = camp$season_name, join_code = camp$join_code,
+       signup_open = camp$signup_open,
        threat = camp$current_threat, max_threat = camp$max_threat,
        tokens = get_state("tokens", list()),
        priority = NULL,

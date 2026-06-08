@@ -29,6 +29,53 @@ campaign_by_code <- function(con, code) {
   if (nrow(r)) as.integer(r$campaign_id[1]) else NA_integer_
 }
 
+#' Edit campaign settings (any provided field).
+update_campaign <- function(con, campaign_id, season_name = NULL, max_threat = NULL,
+                            signup_open = NULL) {
+  if (!is.null(season_name) && nzchar(season_name))
+    DBI::dbExecute(con, "UPDATE campaign SET season_name=$2 WHERE campaign_id=$1",
+                   params = list(campaign_id, season_name))
+  if (!is.null(max_threat))
+    DBI::dbExecute(con, "UPDATE campaign SET max_threat=$2 WHERE campaign_id=$1",
+                   params = list(campaign_id, as.integer(max_threat)))
+  if (!is.null(signup_open))
+    DBI::dbExecute(con, "UPDATE campaign SET signup_open=$2 WHERE campaign_id=$1",
+                   params = list(campaign_id, isTRUE(signup_open)))
+  invisible(TRUE)
+}
+
+#' Mint a fresh join code (e.g. if one leaks). Returns the new code.
+regen_join_code <- function(con, campaign_id) {
+  ensure_join_code_col(con)
+  code <- gen_join_code()
+  while (nrow(DBI::dbGetQuery(con,
+    "SELECT 1 FROM campaign WHERE join_code=$1 AND campaign_id<>$2", params = list(code, campaign_id))))
+    code <- gen_join_code()
+  DBI::dbExecute(con, "UPDATE campaign SET join_code=$2 WHERE campaign_id=$1",
+                 params = list(campaign_id, code))
+  code
+}
+
+#' Permanently delete a campaign and everything that references it. The schema
+#' FKs have no ON DELETE CASCADE, so children are removed in dependency order.
+delete_campaign <- function(con, campaign_id) {
+  DBI::dbWithTransaction(con, {
+    ex <- function(sql) DBI::dbExecute(con, sql, params = list(campaign_id))
+    ex("DELETE FROM event_log WHERE campaign_id = $1")
+    ex("DELETE FROM actions   WHERE round_id IN (SELECT round_id FROM rounds WHERE campaign_id=$1)")
+    ex("DELETE FROM battles   WHERE round_id IN (SELECT round_id FROM rounds WHERE campaign_id=$1)")
+    ex("DELETE FROM movements WHERE round_id IN (SELECT round_id FROM rounds WHERE campaign_id=$1)")
+    ex("DELETE FROM camps         WHERE team_id IN (SELECT team_id FROM kill_teams WHERE campaign_id=$1)")
+    ex("DELETE FROM hex_resources WHERE hex_uid IN (SELECT hex_uid FROM hexes WHERE campaign_id=$1)")
+    ex("DELETE FROM rounds         WHERE campaign_id = $1")
+    ex("DELETE FROM kill_teams     WHERE campaign_id = $1")
+    ex("DELETE FROM campaign_state WHERE campaign_id = $1")
+    ex("DELETE FROM hexes          WHERE campaign_id = $1")
+    ex("DELETE FROM campaign       WHERE campaign_id = $1")
+  })
+  invisible(TRUE)
+}
+
 #' Ensure the catalogue table exists (idempotent; safe on a live DB).
 ensure_catalogue <- function(con) {
   DBI::dbExecute(con,
@@ -119,6 +166,10 @@ join_campaign <- function(con, campaign_id, player_name, team_name, base_hex,
                           login_handle = NULL) {
   if (!nzchar(player_name) || !nzchar(team_name))
     return(list(ok = FALSE, msg = "Player name and kill team are required."))
+  so <- DBI::dbGetQuery(con, "SELECT signup_open FROM campaign WHERE campaign_id=$1",
+                        params = list(campaign_id))$signup_open
+  if (length(so) && !isTRUE(so))
+    return(list(ok = FALSE, msg = "Sign-ups are closed for this campaign."))
   h <- DBI::dbGetQuery(con,
     "SELECT hex_uid, type FROM hexes WHERE campaign_id = $1 AND hex_number = $2",
     params = list(campaign_id, as.integer(base_hex)))
