@@ -56,7 +56,7 @@ theme <- bs_theme(
     .code-tag { font-family:'Chakra Petch'; font-size:2rem; letter-spacing:.2em; color:#36e0a0; }")
 
 ui <- page_navbar(
-  title = "CTESIPHUS EXPEDITION", theme = theme, fillable = TRUE, id = "nav",
+  title = "KTC Campaign Tool", theme = theme, fillable = TRUE, id = "nav",
   sidebar = sidebar(open = "closed", width = 280,
     selectInput("campaign", "Campaign (facilitator)", choices = NULL),
     selectInput("team", "Your kill team", choices = NULL),
