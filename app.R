@@ -202,6 +202,15 @@ server <- function(input, output, session) {
     }
   }, once = TRUE)
 
+  observeEvent(input$reconnect, {
+    rv$mng_msg <- "Waking the database..."
+    cs <- set_campaign_choices(selected = rv$campaign_id)
+    if (!is.null(cs) && nrow(cs)) {
+      if (is.null(rv$campaign_id)) rv$campaign_id <- cs$campaign_id[1]
+      refresh()
+    }
+    rv$mng_msg <- if (is.null(rv$err)) "Database is awake." else paste("Still offline:", rv$err)
+  })
   observeEvent(input$campaign,     select_campaign(input$campaign),     ignoreInit = TRUE)
   observeEvent(input$mng_campaign, select_campaign(input$mng_campaign), ignoreInit = TRUE)
   observe({ req(rv$board)
@@ -210,7 +219,10 @@ server <- function(input, output, session) {
     updateSelectInput(session, "team", choices = setNames(ids, labs)) })
 
   output$cursor_badge <- renderUI({
-    if (!is.null(rv$err)) return(div(class = "threat", "DB offline"))
+    if (!is.null(rv$err)) return(tagList(
+      div(class = "threat", "DB offline"),
+      div(class = "text-secondary", style = "font-size:.8rem", "Neon may be asleep."),
+      actionButton("reconnect", "Wake database", class = "btn-warning btn-sm w-100 mt-2")))
     req(rv$board)
     div(class = "threat",
         sprintf("Round %s - %s (%s)", rv$board$cursor$round, rv$board$cursor$phase,

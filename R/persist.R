@@ -12,14 +12,26 @@
 
 library(DBI); library(jsonlite); library(tibble); library(dplyr)
 
-db_connect <- function() {
-  DBI::dbConnect(RPostgres::Postgres(),
-    dbname   = Sys.getenv("CTES_DB",   "ctesiphus"),
-    host     = Sys.getenv("CTES_HOST", "localhost"),
-    port     = as.integer(Sys.getenv("CTES_PORT", "5432")),
-    user     = Sys.getenv("CTES_USER"),
-    password = Sys.getenv("CTES_PASS"),
-    sslmode  = Sys.getenv("CTES_SSLMODE", "require"))   # Neon requires SSL
+#' Connect to Postgres. Neon's free tier suspends the compute after idle and
+#' the first connection that wakes it can time out, so we retry with a short
+#' backoff - each attempt also serves as a wake-up "poke".
+db_connect <- function(retries = 4L, wait = 1.2) {
+  last <- NULL
+  for (attempt in seq_len(retries)) {
+    con <- tryCatch(
+      DBI::dbConnect(RPostgres::Postgres(),
+        dbname   = Sys.getenv("CTES_DB",   "ctesiphus"),
+        host     = Sys.getenv("CTES_HOST", "localhost"),
+        port     = as.integer(Sys.getenv("CTES_PORT", "5432")),
+        user     = Sys.getenv("CTES_USER"),
+        password = Sys.getenv("CTES_PASS"),
+        sslmode  = Sys.getenv("CTES_SSLMODE", "require")),   # Neon requires SSL
+      error = function(e) { last <<- e; NULL })
+    if (!is.null(con)) return(con)
+    if (attempt < retries) Sys.sleep(wait * attempt)         # back off; let Neon wake
+  }
+  stop(sprintf("Could not reach the database after %d attempts: %s",
+               retries, if (!is.null(last)) conditionMessage(last) else "unknown error"))
 }
 
 # ---- key maps ---------------------------------------------------------------
