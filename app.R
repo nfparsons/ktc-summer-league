@@ -39,24 +39,24 @@ board_text <- function(board) {
          "\nTaken bases: ",
          if (length(taken)) paste(sprintf("hex %d = %s", taken, owners), collapse = "; ") else "none")
 }
-board_card <- function(id) card(card_header("Current board - bases (amber), open surface hexes"),
-  plotOutput(paste0(id, "_board"), height = "300px"),
+board_card <- function(id) card(card_header("Current board - bases outlined in orange, open surface hexes"),
+  plotOutput(paste0(id, "_board"), height = "480px"),
   verbatimTextOutput(paste0(id, "_summary")))
 
 theme <- bs_theme(
-  version = 5, bg = "#0b0e0d", fg = "#cfe8d8",
-  primary = "#36e0a0", secondary = "#1c2622", warning = "#e0a44d",
+  version = 5, bg = "#16161a", fg = "#e8e6e2",
+  primary = "#e0571c", secondary = "#2a2a2d", warning = "#e0571c",
   base_font = font_google("IBM Plex Sans"), heading_font = font_google("Chakra Petch"),
   "border-radius" = "0.15rem") |>
   bs_add_rules("
-    body { background: radial-gradient(1200px 600px at 50% -10%, #14201b 0%, #0b0e0d 60%); }
-    .card { border: 1px solid #1f2d27; box-shadow: 0 0 0 1px #0e1512 inset; }
-    .threat { letter-spacing:.08em; text-transform:uppercase; color:#e0a44d; }
-    .hex-tag { font-family:'Chakra Petch'; font-size:1.6rem; color:#36e0a0; }
-    .code-tag { font-family:'Chakra Petch'; font-size:2rem; letter-spacing:.2em; color:#36e0a0; }")
+    body { background: radial-gradient(1200px 600px at 50% -10%, #232327 0%, #141417 60%); }
+    .card { border: 1px solid #2c2c31; box-shadow: 0 0 0 1px #0e0e12 inset; }
+    .threat { letter-spacing:.08em; text-transform:uppercase; color:#e0571c; }
+    .hex-tag { font-family:'Chakra Petch'; font-size:1.6rem; color:#e0571c; }
+    .code-tag { font-family:'Chakra Petch'; font-size:2rem; letter-spacing:.2em; color:#e0571c; }")
 
 ui <- page_navbar(
-  title = "KTC CAMPAIGN TOOL", theme = theme, fillable = TRUE, id = "nav",
+  title = "KTC Campaign Tool", theme = theme, fillable = TRUE, id = "nav",
   sidebar = sidebar(open = "closed", width = 280,
     selectInput("campaign", "Campaign (facilitator)", choices = NULL),
     selectInput("team", "Your kill team", choices = NULL),
@@ -87,6 +87,7 @@ ui <- page_navbar(
 
   nav_panel("Manage", icon = icon("sliders"),
     card(card_header("Campaign settings"),
+      selectInput("mng_campaign", "Campaign", choices = NULL),
       textInput("mng_season", "Season name"),
       numericInput("mng_maxthreat", "Max threat (campaign ends when reached)", 7, 2, 12),
       checkboxInput("mng_signup", "Sign-ups open", TRUE),
@@ -155,11 +156,21 @@ server <- function(input, output, session) {
     DBI::dbGetQuery(con, "SELECT campaign_id, season_name FROM campaign ORDER BY campaign_id"))
   set_campaign_choices <- function(selected = NULL) {
     cs <- load_campaigns()
-    if (!is.null(cs) && nrow(cs))
-      updateSelectInput(session, "campaign",
-        choices = setNames(cs$campaign_id, sprintf("%d - %s", cs$campaign_id, cs$season_name)),
-        selected = selected)
+    if (!is.null(cs) && nrow(cs)) {
+      ch <- setNames(cs$campaign_id, sprintf("%d - %s", cs$campaign_id, cs$season_name))
+      updateSelectInput(session, "campaign",     choices = ch, selected = selected)
+      updateSelectInput(session, "mng_campaign", choices = ch, selected = selected)
+    }
     cs
+  }
+  # single path for switching campaigns; keeps both selectors in sync, no loop
+  select_campaign <- function(cid) {
+    cid <- suppressWarnings(as.integer(cid))
+    if (!length(cid) || is.na(cid)) return()
+    if (!is.null(rv$campaign_id) && identical(rv$campaign_id, cid)) return()
+    rv$campaign_id <- cid; rv$join_tick <- rv$join_tick + 1; refresh()
+    updateSelectInput(session, "campaign",     selected = cid)
+    updateSelectInput(session, "mng_campaign", selected = cid)
   }
   base_url <- reactive({ cd <- session$clientData
     port <- if (!is.null(cd$url_port) && nzchar(cd$url_port)) paste0(":", cd$url_port) else ""
@@ -191,8 +202,8 @@ server <- function(input, output, session) {
     }
   }, once = TRUE)
 
-  observeEvent(input$campaign, { rv$campaign_id <- as.integer(input$campaign)
-    rv$join_tick <- rv$join_tick + 1; refresh() }, ignoreInit = TRUE)
+  observeEvent(input$campaign,     select_campaign(input$campaign),     ignoreInit = TRUE)
+  observeEvent(input$mng_campaign, select_campaign(input$mng_campaign), ignoreInit = TRUE)
   observe({ req(rv$board)
     ids  <- names(rv$board$teams)
     labs <- vapply(rv$board$teams, function(t) t$name %||% ids, character(1))
