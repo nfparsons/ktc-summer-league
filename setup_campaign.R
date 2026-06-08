@@ -10,6 +10,25 @@
 
 library(DBI); library(readr); library(jsonlite)
 
+#' Short, unambiguous join code (no 0/O/1/I) for campaign gating.
+gen_join_code <- function(n = 6L) {
+  a <- strsplit("ABCDEFGHJKLMNPQRSTUVWXYZ23456789", "")[[1]]
+  paste(sample(a, n, replace = TRUE), collapse = "")
+}
+#' Add the join_code column + unique index if missing (idempotent on a live DB).
+ensure_join_code_col <- function(con) {
+  DBI::dbExecute(con, "ALTER TABLE campaign ADD COLUMN IF NOT EXISTS join_code text")
+  DBI::dbExecute(con, "CREATE UNIQUE INDEX IF NOT EXISTS campaign_join_code_uniq ON campaign(join_code)")
+  invisible(TRUE)
+}
+#' Resolve a join code to a campaign_id (case-insensitive); NA if none.
+campaign_by_code <- function(con, code) {
+  if (is.null(code) || !nzchar(code)) return(NA_integer_)
+  r <- DBI::dbGetQuery(con, "SELECT campaign_id FROM campaign WHERE upper(join_code) = upper($1)",
+                       params = list(code))
+  if (nrow(r)) as.integer(r$campaign_id[1]) else NA_integer_
+}
+
 #' Ensure the catalogue table exists (idempotent; safe on a live DB).
 ensure_catalogue <- function(con) {
   DBI::dbExecute(con,
@@ -64,12 +83,16 @@ create_campaign <- function(con, season_name, available_teams = character(),
   }
   board <- readr::read_csv(file.path(maps_dir, sprintf("map%d.csv", map_id)),
                            show_col_types = FALSE)
+  ensure_join_code_col(con)
+  code <- gen_join_code()
+  while (nrow(DBI::dbGetQuery(con, "SELECT 1 FROM campaign WHERE join_code = $1", params = list(code))))
+    code <- gen_join_code()
 
   DBI::dbWithTransaction(con, {
     cid <- DBI::dbGetQuery(con,
-      "INSERT INTO campaign (season_name, map_id, max_threat)
-       VALUES ($1, $2, $3) RETURNING campaign_id",
-      params = list(season_name, as.integer(map_id), as.integer(max_threat)))$campaign_id
+      "INSERT INTO campaign (season_name, map_id, max_threat, join_code)
+       VALUES ($1, $2, $3, $4) RETURNING campaign_id",
+      params = list(season_name, as.integer(map_id), as.integer(max_threat), code))$campaign_id
     for (i in seq_len(nrow(board))) {
       r <- board[i, ]
       DBI::dbExecute(con,

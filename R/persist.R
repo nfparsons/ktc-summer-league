@@ -34,7 +34,8 @@ db_connect <- function() {
 # ---- load -------------------------------------------------------------------
 load_board <- function(con, campaign_id) {
   camp <- DBI::dbGetQuery(con,
-    "SELECT current_threat, max_threat, current_round, current_phase, phase_status
+    "SELECT season_name, join_code, current_threat, max_threat,
+            current_round, current_phase, phase_status
        FROM campaign WHERE campaign_id = $1", params = list(campaign_id))
   keys <- .hexmap_keys(con, campaign_id)
 
@@ -61,7 +62,8 @@ load_board <- function(con, campaign_id) {
     search_cost        = vapply(hx$hex_uid, pick, integer(1), type = "search_cost"))
 
   kt <- DBI::dbGetQuery(con,
-    "SELECT team_id, base_hex_uid, current_hex_uid, campaign_points, supply_points
+    "SELECT team_id, team_name, player_name, base_hex_uid, current_hex_uid,
+            campaign_points, supply_points
        FROM kill_teams WHERE campaign_id = $1", params = list(campaign_id))
   camps <- DBI::dbGetQuery(con,
     "SELECT c.team_id, c.hex_uid FROM camps c JOIN kill_teams t ON t.team_id = c.team_id
@@ -77,6 +79,8 @@ load_board <- function(con, campaign_id) {
   for (i in seq_len(nrow(kt))) {
     tid <- as.character(kt$team_id[i])
     teams[[tid]] <- list(
+      name     = kt$team_name[i],
+      player   = kt$player_name[i],
       hex      = unname(keys$num_of[as.character(kt$current_hex_uid[i])]),
       supply   = kt$supply_points[i],
       campaign = kt$campaign_points[i],
@@ -86,6 +90,7 @@ load_board <- function(con, campaign_id) {
   }
 
   list(map = map, teams = teams,
+       season = camp$season_name, join_code = camp$join_code,
        threat = camp$current_threat, max_threat = camp$max_threat,
        tokens = get_state("tokens", list()),
        priority = NULL,

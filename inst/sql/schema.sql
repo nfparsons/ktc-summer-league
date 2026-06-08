@@ -40,6 +40,7 @@ CREATE TABLE campaign (
     current_phase  phase_name   NOT NULL DEFAULT 'setup',
     phase_status   phase_status NOT NULL DEFAULT 'open',
     signup_open    boolean      NOT NULL DEFAULT true,
+    join_code      text         UNIQUE,           -- gate: players join by code/QR
     created_at     timestamptz  NOT NULL DEFAULT now()
 );
 

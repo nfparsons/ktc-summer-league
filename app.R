@@ -1,20 +1,17 @@
 # =====================================================================
 # Ctesiphus Expedition - campaign manager (Shiny, mobile-first)
 # ---------------------------------------------------------------------
-# GUI-driven; no R console use required. Flows:
-#   - Setup (facilitator): create a campaign shell - season, board, and the
-#       roster of available kill teams players may choose from.
-#   - Join (players):      sign yourself up - pick your kill team, an optional
-#       handle, and an open surface base hex.
-#   - Pre-game / Post-game / Facilitator: as before.
-# DB credentials come from .Renviron (CTES_*).
+# GUI-driven; no R console required. The current board is shown on every
+# post-creation tab. Players reach a campaign by join code or QR (a code
+# embedded in the app URL as ?join=CODE), not by picking from a list.
+# DB credentials come from the host's env vars (CTES_*).
 # =====================================================================
 
 library(shiny); library(bslib); library(dplyr); library(readr); library(jsonlite)
 
 for (f in c("dice.R","hexmap.R","exploration_tables.R","explore.R","actions.R",
             "movement.R","battle.R","threat.R","orchestrator.R","map_selection.R",
-            "persist.R","lifecycle.R"))
+            "persist.R","lifecycle.R","board_plot.R"))
   source(file.path("R", f), local = FALSE)
 source("setup_campaign.R", local = FALSE)
 
@@ -33,6 +30,18 @@ surface_hexes_of <- function(map_id) {
                        show_col_types = FALSE)
   sort(m$hex_number[m$type == "surface"])
 }
+board_text <- function(board) {
+  m <- board$map; surf <- sort(m$hex_number[m$type == "surface"])
+  taken  <- vapply(board$teams, function(t) as.integer(t$base), integer(1))
+  owners <- vapply(board$teams, function(t) t$name %||% "", character(1))
+  open   <- setdiff(surf, taken)
+  paste0("Open surface hexes: ", if (length(open)) paste(open, collapse = ", ") else "none",
+         "\nTaken bases: ",
+         if (length(taken)) paste(sprintf("hex %d = %s", taken, owners), collapse = "; ") else "none")
+}
+board_card <- function(id) card(card_header("Current board - bases (amber), open surface hexes"),
+  plotOutput(paste0(id, "_board"), height = "300px"),
+  verbatimTextOutput(paste0(id, "_summary")))
 
 theme <- bs_theme(
   version = 5, bg = "#0b0e0d", fg = "#cfe8d8",
@@ -43,12 +52,13 @@ theme <- bs_theme(
     body { background: radial-gradient(1200px 600px at 50% -10%, #14201b 0%, #0b0e0d 60%); }
     .card { border: 1px solid #1f2d27; box-shadow: 0 0 0 1px #0e1512 inset; }
     .threat { letter-spacing:.08em; text-transform:uppercase; color:#e0a44d; }
-    .hex-tag { font-family:'Chakra Petch'; font-size:1.6rem; color:#36e0a0; }")
+    .hex-tag { font-family:'Chakra Petch'; font-size:1.6rem; color:#36e0a0; }
+    .code-tag { font-family:'Chakra Petch'; font-size:2rem; letter-spacing:.2em; color:#36e0a0; }")
 
 ui <- page_navbar(
   title = "CTESIPHUS EXPEDITION", theme = theme, fillable = TRUE, id = "nav",
   sidebar = sidebar(open = "closed", width = 280,
-    selectInput("campaign", "Campaign", choices = NULL),
+    selectInput("campaign", "Campaign (facilitator)", choices = NULL),
     selectInput("team", "Your kill team", choices = NULL),
     uiOutput("cursor_badge")),
 
@@ -66,15 +76,22 @@ ui <- page_navbar(
           "Map 4 - 37 hexes" = 4, "Map 5 - 52 hexes" = 5))),
       actionButton("set_map", "Set board", class = "btn-secondary w-100"),
       uiOutput("map_info"),
-      textAreaInput("roster", "Available kill teams (one per line)", rows = 6,
-        placeholder = "Paste the factions players may pick, one per line."),
+      textAreaInput("roster", "Available kill teams (one per line)", rows = 6),
       actionButton("create_campaign", "Create campaign", class = "btn-primary w-100 mt-2"),
       uiOutput("begin_btn"),
-      verbatimTextOutput("setup_status"))),
+      verbatimTextOutput("setup_status")),
+    card(card_header("Share with players"),
+      div(class = "text-secondary", "Players join with this code or by scanning the QR."),
+      div(class = "code-tag", textOutput("setup_code_txt", inline = TRUE)),
+      plotOutput("setup_qr", height = "220px"))),
 
   nav_panel("Join", icon = icon("user-plus"),
-    card(card_header("Sign up for the selected campaign"),
-      div(class = "text-secondary mb-2", "Pick the campaign in the sidebar first."),
+    card(card_header("Find your campaign"),
+      textInput("join_code", "Join code (from your facilitator / QR)"),
+      actionButton("find_campaign", "Find campaign", class = "btn-secondary w-100"),
+      div(class = "text-secondary mt-2", textOutput("join_campaign_label"))),
+    board_card("join"),
+    card(card_header("Sign up"),
       textInput("join_player", "Your name"),
       selectInput("join_team", "Your kill team", choices = NULL),
       textInput("join_handle", "Handle (optional)"),
@@ -83,12 +100,14 @@ ui <- page_navbar(
       verbatimTextOutput("join_status"))),
 
   nav_panel("Pre-game", icon = icon("eye"),
+    board_card("pre"),
     card(card_header("Where you stand"),
       div(class = "hex-tag", textOutput("hex_label", inline = TRUE)), uiOutput("killzone")),
     card(card_header("Location rule"), textOutput("loc_rule")),
     card(card_header("Condition rule"), textOutput("cond_rule"))),
 
   nav_panel("Post-game", icon = icon("dice"),
+    board_card("post"),
     card(card_header("Report your battle"),
       radioButtons("result", NULL,
         c("Win"="win","Draw"="draw","Loss"="loss","Bye"="bye"), inline = TRUE),
@@ -97,10 +116,14 @@ ui <- page_navbar(
     card(card_header("Activity"), verbatimTextOutput("player_log"))),
 
   nav_panel("Facilitator", icon = icon("gauge"),
+    board_card("fac"),
     card(card_header("Round control"), uiOutput("phase_state"),
       layout_columns(
         actionButton("resolve", "Resolve current phase", class = "btn-warning"),
         actionButton("advance", "Advance / begin", class = "btn-primary"))),
+    card(card_header("Join code"),
+      div(class = "code-tag", textOutput("fac_code_txt", inline = TRUE)),
+      plotOutput("fac_qr", height = "200px")),
     card(card_header("Resolution log"), verbatimTextOutput("facilitator_log")))
 )
 
@@ -123,19 +146,42 @@ server <- function(input, output, session) {
         selected = selected)
     cs
   }
+  base_url <- reactive({ cd <- session$clientData
+    port <- if (!is.null(cd$url_port) && nzchar(cd$url_port)) paste0(":", cd$url_port) else ""
+    paste0(cd$url_protocol, "//", cd$url_hostname, port, cd$url_pathname) })
 
+  # startup: campaigns, catalogue auto-seed, roster pre-fill
   observeEvent(TRUE, {
     cs <- set_campaign_choices()
     if (!is.null(cs) && nrow(cs)) { rv$campaign_id <- cs$campaign_id[1]; refresh() }
     else nav_select("nav", "Setup")
-    cat_names <- withCon(function(con) { ensure_catalogue(con); catalogue_teams(con) })
+    cat_names <- withCon(function(con) {
+      ensure_catalogue(con)
+      if (!length(catalogue_teams(con))) try(load_catalogue(con, "inst/kill_teams.csv"), silent = TRUE)
+      catalogue_teams(con) })
     if (!is.null(cat_names) && length(cat_names))
       updateTextAreaInput(session, "roster", value = paste(cat_names, collapse = "\n"))
   }, once = TRUE)
 
+  # QR deep-link: ?join=CODE routes a scanner straight to that campaign's Join
+  observeEvent(session$clientData$url_search, {
+    q <- parseQueryString(session$clientData$url_search)
+    code <- q[["join"]]
+    if (!is.null(code) && nzchar(code)) {
+      cid <- withCon(function(con) campaign_by_code(con, code))
+      if (!is.null(cid) && !is.na(cid)) {
+        rv$campaign_id <- as.integer(cid); set_campaign_choices(selected = rv$campaign_id)
+        rv$join_tick <- rv$join_tick + 1; refresh(); nav_select("nav", "Join")
+      }
+    }
+  }, once = TRUE)
+
   observeEvent(input$campaign, { rv$campaign_id <- as.integer(input$campaign)
     rv$join_tick <- rv$join_tick + 1; refresh() }, ignoreInit = TRUE)
-  observe({ req(rv$board); updateSelectInput(session, "team", choices = names(rv$board$teams)) })
+  observe({ req(rv$board)
+    ids  <- names(rv$board$teams)
+    labs <- vapply(rv$board$teams, function(t) t$name %||% ids, character(1))
+    updateSelectInput(session, "team", choices = setNames(ids, labs)) })
 
   output$cursor_badge <- renderUI({
     if (!is.null(rv$err)) return(div(class = "threat", "DB offline"))
@@ -146,12 +192,27 @@ server <- function(input, output, session) {
         br(), sprintf("Threat %d / %d", rv$board$threat, rv$board$max_threat))
   })
 
-  # ---- Setup (facilitator) --------------------------------------------------
+  # board view on every post-creation tab
+  for (k in c("join","pre","post","fac")) local({ key <- k
+    output[[paste0(key, "_board")]]   <- renderPlot({ req(rv$board); plot_board(rv$board$map, rv$board$teams) })
+    output[[paste0(key, "_summary")]] <- renderText({ req(rv$board); board_text(rv$board) })
+  })
+
+  # QR + code display (Setup and Facilitator share the active campaign's code)
+  qr_render <- function(id) output[[id]] <- renderPlot({
+    req(rv$board); req(rv$board$join_code)
+    if (!requireNamespace("qrcode", quietly = TRUE)) { plot.new(); text(.5,.5,"Install 'qrcode' for QR codes"); return() }
+    plot(qrcode::qr_code(paste0(base_url(), "?join=", rv$board$join_code)))
+  })
+  qr_render("setup_qr"); qr_render("fac_qr")
+  output$setup_code_txt <- renderText(if (!is.null(rv$board)) rv$board$join_code %||% "" else "")
+  output$fac_code_txt   <- renderText(if (!is.null(rv$board)) rv$board$join_code %||% "" else "")
+
+  # ---- Setup ----------------------------------------------------------------
   observeEvent(input$set_map, {
     mid <- if (input$map_mode == "choose") as.integer(input$choose_map) else {
       set.seed(input$draw_seed); as.integer(choose_map(input$draw_players)) }
-    rv$setup_map <- mid
-    rv$setup_msg <- sprintf("Board set to map %d.", mid)
+    rv$setup_map <- mid; rv$setup_msg <- sprintf("Board set to map %d.", mid)
   })
   output$map_info <- renderUI({ req(rv$setup_map)
     div(class = "text-secondary",
@@ -166,17 +227,26 @@ server <- function(input, output, session) {
     roster <- trimws(strsplit(input$roster, "\n")[[1]]); roster <- roster[nzchar(roster)]
     if (!length(roster)) { rv$setup_msg <- "List at least one available kill team."; return() }
     cid <- withCon(function(con)
-      create_campaign(con, season_name = input$season, available_teams = roster,
-                      map_id = rv$setup_map))
+      create_campaign(con, season_name = input$season, available_teams = roster, map_id = rv$setup_map))
     if (is.null(cid)) { rv$setup_msg <- paste("Create failed:", rv$err); return() }
     rv$campaign_id <- as.integer(cid); set_campaign_choices(selected = rv$campaign_id)
     rv$join_tick <- rv$join_tick + 1; refresh()
-    rv$setup_msg <- sprintf("Created campaign %d (map %d, %d teams on the roster). Players can now Join; click Begin when ready.",
+    rv$setup_msg <- sprintf("Created campaign %d (map %d, %d teams). Share the join code; click Begin when ready.",
                             cid, rv$setup_map, length(roster))
   })
   output$setup_status <- renderText(rv$setup_msg)
 
-  # ---- Join (self-signup) ---------------------------------------------------
+  # ---- Join (code-gated) ----------------------------------------------------
+  observeEvent(input$find_campaign, {
+    cid <- withCon(function(con) campaign_by_code(con, input$join_code))
+    if (is.null(cid) || is.na(cid)) { rv$join_msg <- "No campaign with that code."; return() }
+    rv$campaign_id <- as.integer(cid); set_campaign_choices(selected = rv$campaign_id)
+    rv$join_tick <- rv$join_tick + 1; refresh(); rv$join_msg <- "Campaign found - sign up below."
+  })
+  output$join_campaign_label <- renderText(
+    if (!is.null(rv$board)) sprintf("Campaign: %s (code %s)", rv$board$season %||% "?",
+                                    rv$board$join_code %||% "?") else "Enter a join code to begin.")
+
   join_opts <- reactive({ rv$join_tick; req(rv$campaign_id)
     withCon(function(con) {
       mid <- DBI::dbGetQuery(con, "SELECT map_id FROM campaign WHERE campaign_id=$1",
@@ -196,8 +266,7 @@ server <- function(input, output, session) {
     updateSelectInput(session, "join_team", choices = o$teams)
     updateSelectInput(session, "join_base", choices = o$bases) })
 
-  observeEvent(input$join_btn, {
-    req(rv$campaign_id)
+  observeEvent(input$join_btn, { req(rv$campaign_id)
     r <- withCon(function(con) join_campaign(con, rv$campaign_id, input$join_player,
                    input$join_team, as.integer(input$join_base), input$join_handle))
     if (is.null(r)) { rv$join_msg <- paste("DB error:", rv$err); return() }
@@ -250,8 +319,8 @@ server <- function(input, output, session) {
       mark_phase_resolved(con, rv$campaign_id); rv$board$cursor$status <- "resolved" })
   })
   observeEvent(c(input$advance, input$advance2), { req(rv$campaign_id)
-    withCon(function(con) { db_advance_phase(con, rv$campaign_id)
-      rv$log <- c(rv$log, "Advanced phase.") }); refresh()
+    withCon(function(con) { db_advance_phase(con, rv$campaign_id); rv$log <- c(rv$log, "Advanced phase.") })
+    refresh()
   }, ignoreInit = TRUE)
   output$facilitator_log <- renderText(paste(rev(tail(rv$log, 20)), collapse = "\n"))
 }
