@@ -10,6 +10,32 @@
 
 library(DBI); library(readr); library(jsonlite)
 
+#' Ensure the catalogue table exists (idempotent; safe on a live DB).
+ensure_catalogue <- function(con) {
+  DBI::dbExecute(con,
+    "CREATE TABLE IF NOT EXISTS kill_team_catalogue (
+       name text PRIMARY KEY, faction text, active boolean NOT NULL DEFAULT true)")
+  invisible(TRUE)
+}
+
+#' Load (upsert) the catalogue from the shipped CSV. Run once to seed; safe to
+#' re-run after a roster update (new teams added, existing left untouched).
+load_catalogue <- function(con, path = "inst/kill_teams.csv") {
+  ensure_catalogue(con)
+  teams <- readr::read_csv(path, show_col_types = FALSE)$name
+  for (n in teams) DBI::dbExecute(con,
+    "INSERT INTO kill_team_catalogue (name) VALUES ($1) ON CONFLICT (name) DO NOTHING",
+    params = list(n))
+  invisible(length(teams))
+}
+
+#' Active catalogue team names, for pre-filling the Setup roster.
+catalogue_teams <- function(con, active_only = TRUE) {
+  q <- if (active_only) "SELECT name FROM kill_team_catalogue WHERE active ORDER BY name"
+       else                "SELECT name FROM kill_team_catalogue ORDER BY name"
+  DBI::dbGetQuery(con, q)$name
+}
+
 #' Apply schema.sql statement-by-statement (RPostgres runs one per call).
 apply_schema <- function(con, path = "inst/sql/schema.sql") {
   lines <- readLines(path)

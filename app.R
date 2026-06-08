@@ -128,6 +128,9 @@ server <- function(input, output, session) {
     cs <- set_campaign_choices()
     if (!is.null(cs) && nrow(cs)) { rv$campaign_id <- cs$campaign_id[1]; refresh() }
     else nav_select("nav", "Setup")
+    cat_names <- withCon(function(con) { ensure_catalogue(con); catalogue_teams(con) })
+    if (!is.null(cat_names) && length(cat_names))
+      updateTextAreaInput(session, "roster", value = paste(cat_names, collapse = "\n"))
   }, once = TRUE)
 
   observeEvent(input$campaign, { rv$campaign_id <- as.integer(input$campaign)

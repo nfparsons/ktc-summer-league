@@ -39,6 +39,7 @@ CREATE TABLE campaign (
     current_round  integer      NOT NULL DEFAULT 0,
     current_phase  phase_name   NOT NULL DEFAULT 'setup',
     phase_status   phase_status NOT NULL DEFAULT 'open',
+    signup_open    boolean      NOT NULL DEFAULT true,
     created_at     timestamptz  NOT NULL DEFAULT now()
 );
 
@@ -80,13 +81,14 @@ CREATE TABLE kill_teams (
     campaign_id     integer NOT NULL REFERENCES campaign,
     player_name     text    NOT NULL,
     team_name       text    NOT NULL,
-    login_handle    text    NOT NULL UNIQUE,         -- ties to shinymanager auth
+    login_handle    text    UNIQUE,                 -- optional; ties to auth if used
     base_hex_uid    integer NOT NULL REFERENCES hexes,
     current_hex_uid integer NOT NULL REFERENCES hexes,
     campaign_points integer NOT NULL DEFAULT 0,
     supply_points   integer NOT NULL DEFAULT 10
                     CHECK (supply_points BETWEEN 0 AND 10),
-    UNIQUE (campaign_id, team_name)
+    UNIQUE (campaign_id, team_name),
+    UNIQUE (campaign_id, base_hex_uid)               -- one team per base hex
 );
 
 -- ---------- bases and camps ------------------------------------------
@@ -194,6 +196,15 @@ CREATE TABLE rule_text (
     rules_text   text,
     updated_at   timestamptz NOT NULL DEFAULT now(),
     updated_by   text
+);
+
+-- ---------- kill team catalogue (campaign-independent reference) ------
+-- Master roster of selectable kill teams; seeded from inst/kill_teams.csv.
+-- `active` toggles a team out of the picker without deleting it.
+CREATE TABLE kill_team_catalogue (
+    name    text PRIMARY KEY,
+    faction text,                                    -- optional grouping
+    active  boolean NOT NULL DEFAULT true
 );
 
 -- ---------- helpful indexes ------------------------------------------
