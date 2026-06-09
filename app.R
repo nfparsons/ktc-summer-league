@@ -144,7 +144,7 @@ ui <- page_navbar(
 
 server <- function(input, output, session) {
   rv <- reactiveValues(board = NULL, log = character(0), err = NULL, db_ok = NA,
-                       campaign_id = NULL,
+                       schema_ready = FALSE, campaign_id = NULL,
                        setup_map = NULL, setup_msg = "", join_msg = "",
                        mng_msg = "", join_tick = 0)
 
@@ -158,6 +158,12 @@ server <- function(input, output, session) {
     rv$db_ok <- TRUE               # we reached the database; anything below is an OPERATION error
     con <- res$con
     on.exit(DBI::dbDisconnect(con))
+    if (!isTRUE(rv$schema_ready)) {                  # once per session, on the first live connection:
+      ok <- tryCatch({ ensure_schema(con); TRUE },   # bring the schema up to date before any query runs
+                     error = function(e) { rv$err <- conditionMessage(e); FALSE })
+      if (!ok) return(NULL)                          # migration failed -> surface it, don't proceed
+      rv$schema_ready <- TRUE
+    }
     tryCatch(fn(con), error = function(e) { rv$err <- conditionMessage(e); NULL })
   }
   refresh <- function() { if (!is.null(rv$campaign_id))

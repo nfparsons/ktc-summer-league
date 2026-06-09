@@ -1919,7 +1919,7 @@
       "checksum": "04bbd180f982e58a9f69fa3d541e720f"
     },
     "app.R": {
-      "checksum": "15abc9d5634d80040a8aea2be5e5c2d8"
+      "checksum": "4fd3f7385c425ed09d27447a67d749ae"
     },
     "archive/002_round_engine.sql": {
       "checksum": "2d901b2877ece1d862f2d185ecc5e856"
@@ -2163,6 +2163,9 @@
     },
     "R/persist.R": {
       "checksum": "4f4e7f74e2e229108d1ebe7be7cd08cb"
+    },
+    "R/setup_campaign.R": {
+      "checksum": "648fe88e6bce1cdf86efbdecab88150b"
     },
     "R/threat.R": {
       "checksum": "3360c600fe06fc07b3ee8909f2c12fcb"
