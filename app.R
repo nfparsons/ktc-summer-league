@@ -230,8 +230,11 @@ server <- function(input, output, session) {
   observeEvent(input$campaign,     select_campaign(input$campaign),     ignoreInit = TRUE)
   observeEvent(input$mng_campaign, select_campaign(input$mng_campaign), ignoreInit = TRUE)
   observe({ req(rv$board)
-    ids  <- names(rv$board$teams)
-    labs <- vapply(rv$board$teams, function(t) t$name %||% ids, character(1))
+    teams <- rv$board$teams
+    if (length(teams) == 0) {                 # campaign with no players yet
+      updateSelectInput(session, "team", choices = character(0)); return() }
+    ids  <- names(teams)
+    labs <- vapply(seq_along(teams), function(i) teams[[i]]$name %||% ids[i], character(1))
     updateSelectInput(session, "team", choices = setNames(ids, labs)) })
 
   output$cursor_badge <- renderUI({
