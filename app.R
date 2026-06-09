@@ -147,9 +147,13 @@ server <- function(input, output, session) {
                        setup_map = NULL, setup_msg = "", join_msg = "",
                        mng_msg = "", join_tick = 0)
 
-  withCon <- function(fn) tryCatch(
-    { con <- db_connect(); on.exit(DBI::dbDisconnect(con)); fn(con) },
-    error = function(e) { rv$err <- conditionMessage(e); NULL })
+  withCon <- function(fn) {
+    res <- db_connect()
+    if (!res$ok) { rv$err <- res$db_response; return(NULL) }  # connect status + DB response
+    con <- res$con
+    on.exit(DBI::dbDisconnect(con))
+    tryCatch(fn(con), error = function(e) { rv$err <- conditionMessage(e); NULL })
+  }
   refresh <- function() { if (!is.null(rv$campaign_id))
     withCon(function(con) { rv$board <- load_board(con, rv$campaign_id); rv$err <- NULL }) }
   load_campaigns <- function() withCon(function(con)

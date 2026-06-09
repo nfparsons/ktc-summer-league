@@ -15,23 +15,38 @@ library(DBI); library(jsonlite); library(tibble); library(dplyr)
 #' Connect to Postgres. Neon's free tier suspends the compute after idle and
 #' the first connection that wakes it can time out, so we retry with a short
 #' backoff - each attempt also serves as a wake-up "poke".
-db_connect <- function(retries = 4L, wait = 1.2) {
-  last <- NULL
+#'
+#' Returns a status list in the same ok / log style the action layer uses,
+#' carrying the database's own message in `db_response` so callers can post
+#' the connect status and the DB response together (not only on a hard
+#' failure). NOTE: this no longer returns a bare connection or stop()s -
+#' callers read `$ok` and `$con` (see withCon() in app.R).
+#'
+#' `connect_fn` is injectable so the retry / return logic can be unit-tested
+#' with a fake connector, no live database required; see
+#' tests/testthat/test-db-connect.R.
+db_connect <- function(retries = 4L, wait = 1.2,
+                       connect_fn = function() {
+                         DBI::dbConnect(RPostgres::Postgres(),
+                           dbname   = Sys.getenv("CTES_DB",   "ctesiphus"),
+                           host     = Sys.getenv("CTES_HOST", "localhost"),
+                           port     = as.integer(Sys.getenv("CTES_PORT", "5432")),
+                           user     = Sys.getenv("CTES_USER"),
+                           password = Sys.getenv("CTES_PASS"),
+                           sslmode  = Sys.getenv("CTES_SSLMODE", "require"))  # Neon requires SSL
+                       }) {
+  last_msg <- ""
   for (attempt in seq_len(retries)) {
-    con <- tryCatch(
-      DBI::dbConnect(RPostgres::Postgres(),
-        dbname   = Sys.getenv("CTES_DB",   "ctesiphus"),
-        host     = Sys.getenv("CTES_HOST", "localhost"),
-        port     = as.integer(Sys.getenv("CTES_PORT", "5432")),
-        user     = Sys.getenv("CTES_USER"),
-        password = Sys.getenv("CTES_PASS"),
-        sslmode  = Sys.getenv("CTES_SSLMODE", "require")),   # Neon requires SSL
-      error = function(e) { last <<- e; NULL })
-    if (!is.null(con)) return(con)
+    con <- tryCatch(connect_fn(),
+                    error = function(e) { last_msg <<- conditionMessage(e); NULL })
+    if (!is.null(con))
+      return(list(ok = TRUE, con = con, attempts = attempt, db_response = "",
+                  log = sprintf("Connected on attempt %d.", attempt)))
     if (attempt < retries) Sys.sleep(wait * attempt)         # back off; let Neon wake
   }
-  stop(sprintf("Could not reach the database after %d attempts: %s",
-               retries, if (!is.null(last)) conditionMessage(last) else "unknown error"))
+  list(ok = FALSE, con = NULL, attempts = retries, db_response = last_msg,
+       log = sprintf("Could not reach the database after %d attempts: %s",
+                     retries, last_msg))
 }
 
 # ---- key maps ---------------------------------------------------------------
