@@ -56,7 +56,7 @@ theme <- bs_theme(
     .code-tag { font-family:'Chakra Petch'; font-size:2rem; letter-spacing:.2em; color:#e0571c; }")
 
 ui <- page_navbar(
-  title = "KTC Campaign Tool", theme = theme, fillable = TRUE, id = "nav",
+  title = "KTC Campaign Tool", theme = theme, fillable = FALSE, id = "nav",
   sidebar = sidebar(open = "closed", width = 280,
     selectInput("campaign", "Campaign (facilitator)", choices = NULL),
     selectInput("team", "Your kill team", choices = NULL),
@@ -83,7 +83,7 @@ ui <- page_navbar(
     card(card_header("Share with players"),
       div(class = "text-secondary", "Players join with this code or by scanning the QR."),
       div(class = "code-tag", textOutput("setup_code_txt", inline = TRUE)),
-      plotOutput("setup_qr", height = "220px"))),
+      plotOutput("setup_qr", width = "220px", height = "220px"))),
 
   nav_panel("Manage", icon = icon("sliders"),
     card(card_header("Campaign settings"),
@@ -97,7 +97,7 @@ ui <- page_navbar(
       div(class = "text-secondary", "Share this link or QR with players:"),
       verbatimTextOutput("mng_link"),
       div(class = "code-tag", textOutput("mng_code_txt", inline = TRUE)),
-      plotOutput("mng_qr", height = "220px"),
+      plotOutput("mng_qr", width = "220px", height = "220px"),
       actionButton("mng_regen", "Regenerate code", class = "btn-secondary w-100")),
     card(card_header("Danger zone"),
       div(class = "text-secondary", "Permanently delete this campaign and all its data."),
