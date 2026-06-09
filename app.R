@@ -143,13 +143,19 @@ ui <- page_navbar(
 )
 
 server <- function(input, output, session) {
-  rv <- reactiveValues(board = NULL, log = character(0), err = NULL, campaign_id = NULL,
+  rv <- reactiveValues(board = NULL, log = character(0), err = NULL, db_ok = NA,
+                       campaign_id = NULL,
                        setup_map = NULL, setup_msg = "", join_msg = "",
                        mng_msg = "", join_tick = 0)
 
   withCon <- function(fn) {
     res <- db_connect()
-    if (!res$ok) { rv$err <- res$db_response; return(NULL) }  # connect status + DB response
+    if (!res$ok) {                 # genuine connection failure -> the DB really is unreachable
+      rv$db_ok <- FALSE
+      rv$err   <- res$db_response
+      return(NULL)
+    }
+    rv$db_ok <- TRUE               # we reached the database; anything below is an OPERATION error
     con <- res$con
     on.exit(DBI::dbDisconnect(con))
     tryCatch(fn(con), error = function(e) { rv$err <- conditionMessage(e); NULL })
@@ -223,10 +229,13 @@ server <- function(input, output, session) {
     updateSelectInput(session, "team", choices = setNames(ids, labs)) })
 
   output$cursor_badge <- renderUI({
-    if (!is.null(rv$err)) return(tagList(
+    if (isFALSE(rv$db_ok)) return(tagList(            # only when db_connect() itself failed
       div(class = "threat", "DB offline"),
-      div(class = "text-secondary", style = "font-size:.8rem", "Neon may be asleep."),
+      div(class = "text-secondary", style = "font-size:.8rem",
+          rv$err %||% "Could not reach the database."),
       actionButton("reconnect", "Wake database", class = "btn-warning btn-sm w-100 mt-2")))
+    if (!is.null(rv$err)) return(                     # DB reachable, but an operation errored
+      div(class = "threat", paste("Error:", rv$err)))
     req(rv$board)
     div(class = "threat",
         sprintf("Round %s - %s (%s)", rv$board$cursor$round, rv$board$cursor$phase,
@@ -245,7 +254,7 @@ server <- function(input, output, session) {
     req(rv$board); req(rv$board$join_code)
     if (!requireNamespace("qrcode", quietly = TRUE)) { plot.new(); text(.5,.5,"Install 'qrcode' for QR codes"); return() }
     plot(qrcode::qr_code(paste0(base_url(), "?join=", rv$board$join_code)))
-  })
+  }, width = 220, height = 220)   # fixed square device; avoids startPNG 'invalid width' on a hidden/unmeasured tab
   qr_render("setup_qr"); qr_render("mng_qr")
   output$setup_code_txt <- renderText(if (!is.null(rv$board)) rv$board$join_code %||% "" else "")
   output$mng_code_txt   <- renderText(if (!is.null(rv$board)) rv$board$join_code %||% "" else "")

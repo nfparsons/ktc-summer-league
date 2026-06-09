@@ -157,6 +157,34 @@
         "RemoteSha.Version": "1.1.1-1.1"
       }
     },
+    "assertthat": {
+      "Source": "CRAN",
+      "Repository": "http://cran.rstudio.com",
+      "description": {
+        "Package": "assertthat",
+        "Title": "Easy Pre and Post Assertions",
+        "Version": "0.2.1",
+        "Authors@R": "\n  person(\"Hadley\", \"Wickham\", , \"hadley@rstudio.com\", c(\"aut\", \"cre\"))",
+        "Description": "An extension to stopifnot() that makes it easy to declare \n    the pre and post conditions that you code should satisfy, while also \n    producing friendly error messages so that your users know what's gone\n    wrong.",
+        "License": "GPL-3",
+        "Imports": "tools",
+        "Suggests": "testthat, covr",
+        "RoxygenNote": "6.0.1",
+        "Collate": "'assert-that.r' 'on-failure.r' 'assertions-file.r'\n'assertions-scalar.R' 'assertions.r' 'base.r'\n'base-comparison.r' 'base-is.r' 'base-logical.r' 'base-misc.r'\n'utils.r' 'validate-that.R'",
+        "NeedsCompilation": "no",
+        "Packaged": "2019-03-21 13:11:01 UTC; hadley",
+        "Author": "Hadley Wickham [aut, cre]",
+        "Maintainer": "Hadley Wickham <hadley@rstudio.com>",
+        "Repository": "CRAN",
+        "Date/Publication": "2019-03-21 14:53:46 UTC",
+        "Built": "R 4.6.0; ; 2026-04-25 15:50:19 UTC; unix",
+        "RemoteType": "standard",
+        "RemotePkgRef": "assertthat",
+        "RemoteRef": "assertthat",
+        "RemoteRepos": "http://cran.rstudio.com",
+        "RemoteSha.Version": "0.2.1"
+      }
+    },
     "base64enc": {
       "Source": "CRAN",
       "Repository": "http://cran.rstudio.com",
@@ -1331,6 +1359,36 @@
         "Built": "R 4.6.0; ; 2026-04-26 02:18:42 UTC; unix"
       }
     },
+    "qrcode": {
+      "Source": "CRAN",
+      "Repository": "http://cran.rstudio.com",
+      "description": {
+        "Type": "Package",
+        "Package": "qrcode",
+        "Title": "Generate QRcodes with R",
+        "Version": "0.3.0",
+        "Authors@R": "c(\n    person(\"Thierry\", \"Onkelinx\", , \"qrcode@muscardinus.be\", role = c(\"aut\", \"cre\"),\n           comment = c(\"Author of the reimplemented functions\", ORCID = \"0000-0001-8804-4216\")),\n    person(\"Victor\", \"Teh\", , \"victorteh@gmail.com\", role = \"aut\",\n           comment = \"Original author\")\n  )",
+        "Description": "Create static QR codes in R. The content of the QR code is\n    exactly what the user defines. We don't add a redirect URL, making it\n    impossible for us to track the usage of the QR code. This allows to\n    generate fast, free to use and privacy friendly QR codes.",
+        "License": "GPL-3",
+        "URL": "https://thierryo.github.io/qrcode/,\nhttps://github.com/ThierryO/qrcode,\nhttps://doi.org/10.5281/zenodo.5040088",
+        "BugReports": "https://github.com/ThierryO/qrcode/issues",
+        "Depends": "R (>= 4.1.0)",
+        "Imports": "assertthat, stats, utils",
+        "Suggests": "httr, jpeg, knitr, opencv, png, rsvg, testthat (>= 3.0.0)",
+        "Config/checklist/keywords": "two-dimensional barcode; matrix barcode",
+        "Config/testthat/edition": "3",
+        "Encoding": "UTF-8",
+        "Language": "en-GB",
+        "RoxygenNote": "7.3.2",
+        "NeedsCompilation": "no",
+        "Packaged": "2024-09-29 16:12:05 UTC; thierry",
+        "Author": "Thierry Onkelinx [aut, cre] (Author of the reimplemented functions,\n    <https://orcid.org/0000-0001-8804-4216>),\n  Victor Teh [aut] (Original author)",
+        "Maintainer": "Thierry Onkelinx <qrcode@muscardinus.be>",
+        "Repository": "CRAN",
+        "Date/Publication": "2024-09-29 16:40:02 UTC",
+        "Built": "R 4.6.0; ; 2026-04-25 16:47:53 UTC; unix"
+      }
+    },
     "rappdirs": {
       "Source": "CRAN",
       "Repository": "http://cran.rstudio.com",
@@ -1861,7 +1919,7 @@
       "checksum": "04bbd180f982e58a9f69fa3d541e720f"
     },
     "app.R": {
-      "checksum": "8c1dfbd29065077393c0da1c2d40fd05"
+      "checksum": "15abc9d5634d80040a8aea2be5e5c2d8"
     },
     "archive/002_round_engine.sql": {
       "checksum": "2d901b2877ece1d862f2d185ecc5e856"
@@ -1882,7 +1940,7 @@
       "checksum": "243d3af44d8910e5094ae385e9758f7a"
     },
     "archive/ctesiphus.zip": {
-      "checksum": "2f93e5f0621914ec28837d0108b101aa"
+      "checksum": "4c7e85e66f79cae715e1ed03a2d84c62"
     },
     "archive/ctesiphus/app.R": {
       "checksum": "8d228ac64410d2a2c8f4802e414f2989"
@@ -1974,6 +2032,12 @@
     "archive/hexmap.R": {
       "checksum": "1ead5c0824be9ad6f6cbaf79f65f99b3"
     },
+    "archive/kill_teams_vector.R": {
+      "checksum": "4dab80855d095175e0b7be4a1c0ea717"
+    },
+    "archive/kill_teams.csv": {
+      "checksum": "78c340b5a28970f78cf3b7e8944db7a5"
+    },
     "archive/lifecycle.R": {
       "checksum": "179d719b5efc1a7dd8243092182c4dc1"
     },
@@ -2038,10 +2102,13 @@
       "checksum": "3360c600fe06fc07b3ee8909f2c12fcb"
     },
     "DESCRIPTION": {
-      "checksum": "9d7ab785d3ac02bf24c7c2252d216513"
+      "checksum": "61f8af8f88631d5cfad29e76f5712723"
     },
     "gitignore.txt": {
       "checksum": "b57cda0e1ef32e830dcba9e0ba05879f"
+    },
+    "inst/kill_teams.csv": {
+      "checksum": "78c340b5a28970f78cf3b7e8944db7a5"
     },
     "inst/maps/map1.csv": {
       "checksum": "7560506ac616b174c12aa96701f2aaee"
@@ -2059,13 +2126,16 @@
       "checksum": "80c3372dc2ece9ddd8ce39a49b8afb20"
     },
     "inst/sql/schema.sql": {
-      "checksum": "d066ab87fa7f983dbd2c7e98a025a82c"
+      "checksum": "115acda85b42a847196420d4cf905866"
     },
     "R/actions.R": {
       "checksum": "651c17cc861150af7fc3b454c76ef986"
     },
     "R/battle.R": {
       "checksum": "243d3af44d8910e5094ae385e9758f7a"
+    },
+    "R/board_plot.R": {
+      "checksum": "81788da8b5e8112fd74baf08103ccb12"
     },
     "R/dice.R": {
       "checksum": "dd17c8bef9c80d05986926bd67fdbc13"
@@ -2092,7 +2162,7 @@
       "checksum": "f8ec88fc340f41d657afbffa6a514fc1"
     },
     "R/persist.R": {
-      "checksum": "603c740df3230be39c172252e5ad71fb"
+      "checksum": "4f4e7f74e2e229108d1ebe7be7cd08cb"
     },
     "R/threat.R": {
       "checksum": "3360c600fe06fc07b3ee8909f2c12fcb"
@@ -2104,7 +2174,10 @@
       "checksum": "b817f93865c591a47a0505dfd6a11244"
     },
     "setup_campaign.R": {
-      "checksum": "69f66cf35584ab5e68e3da11aed148fd"
+      "checksum": "63a55f7115a5bdb1852f941fb9e98fc8"
+    },
+    "tests/testthat/test-db-connect.R": {
+      "checksum": "d61578ba988f5bbe7b9486243ff7ee63"
     },
     "tests/testthat/test-exploration.R": {
       "checksum": "247c9010d67f6bf9b7a23a40782cf739"
